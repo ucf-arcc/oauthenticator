@@ -193,3 +193,61 @@ class LocalCILogonOAuthenticator(LocalAuthenticator, CILogonOAuthenticator):
 
     """A version that mixes in local system user creation"""
     pass
+
+class LocalCILogonMapOAuthenticator(LocalCILogonOAuthenticator):
+
+        mapfile = Unicode(
+                "mapfile",
+                config=True,
+                help="""The location of the map file, containing mappings between OAuth usernames and local UNIX usernames.""",
+        )
+
+        full_names = Bool(
+                False,
+                config=True,
+                help="""
+                If you are including the full username string returned by CILogon in your mapfile, set this to True.
+                Otherwise, the username string will be shortened by removing all text matching the regular expression
+                defined in name_regex
+                """,
+        )
+
+        name_regex = Unicode(
+                '@.*$',
+                config=True,
+                help="""
+
+                If full_names is False, the username string returned by CILogon will by shorteded by removing text matching
+                this regular expression.
+                """,
+        )
+
+
+        prev_map_mtime = 0
+        username_map = dict()
+
+        def normalize_username(self, username):
+                """Overrides method from JupyterHub's Authenticator class.  Builds username_map from a map file.
+
+                To allow updating the map without restarting the Hub, it keeps track of the file mtime.  If the
+                map file has been modified, it will rebuild username_map
+
+                The username is converted to lowercase and, if full_names is set to False, text matching name_regex
+                will be removed.
+                """
+
+                mtime = os.stat(self.mapfile).st_mtime
+
+                if mtime > self.prev_map_mtime:
+                        self.prev_map_mtime = mtime
+                        with open(self.mapfile, 'r') as m:
+                                for line in m:
+                                        names = line.split()
+                                        self.username_map[names[0].lower()] = names[1].lower()
+
+                if not self.full_names:
+                        username = re.sub(self.name_regex, '', username.lower())
+                else:
+                        username = username.lower()
+                username = self.username_map.get(username, username)
+                return username
