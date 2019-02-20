@@ -16,6 +16,7 @@ Caveats:
 
 import json
 import os
+import re
 
 from tornado.auth import OAuth2Mixin
 from tornado import gen, web
